@@ -174,11 +174,12 @@ target_ulong riscv_load_firmware(const char *firmware_filename,
 }
 
 target_ulong riscv_load_kernel(MachineState *machine,
+                               RISCVHartArrayState *harts,
                                target_ulong kernel_start_addr,
                                symbol_fn_t sym_cb)
 {
     const char *kernel_filename = machine->kernel_filename;
-    uint64_t kernel_load_base, kernel_entry;
+    uint64_t kernel_load_base, kernel_entry, kernel_low;
 
     g_assert(kernel_filename != NULL);
 
@@ -189,10 +190,16 @@ target_ulong riscv_load_kernel(MachineState *machine,
      * the (expected) load address load address. This allows kernels to have
      * separate SBI and ELF entry points (used by FreeBSD, for example).
      */
-    if (load_elf_ram_sym(kernel_filename, NULL, NULL, NULL,
-                         NULL, &kernel_load_base, NULL, NULL, 0,
+    if (load_elf_ram_sym(kernel_filename, NULL, NULL, NULL, NULL,
+                         &kernel_load_base, &kernel_low, NULL, 0,
                          EM_RISCV, 1, 0, NULL, true, sym_cb) > 0) {
-        return kernel_load_base;
+        kernel_entry = kernel_load_base;
+
+        if (riscv_is_32bit(harts)) {
+            kernel_entry = kernel_low;
+        }
+
+        return kernel_entry;
     }
 
     if (load_uimage_as(kernel_filename, &kernel_entry, NULL, NULL,
