@@ -1735,6 +1735,55 @@ char *riscv_isa_string(RISCVCPU *cpu)
     return isa_str;
 }
 
+static char **riscv_isa_extensions_list(void)
+{
+    int maxlen = sizeof(riscv_single_letter_exts) + ARRAY_SIZE(isa_edata_arr);
+            //TODO: sizeof v ARRAY_SIZE() here
+    char **extensions = g_new0(char *, maxlen);
+    //TODO gstrings? (buys me gstring_append() etc which seem rather useful
+    //I really dont wanna have to deal with GCing all of these dynamically
+    //strings, since the number of them is dynamic!
+    int i;
+
+    //TLDR though is this yoinked code can be repurposed for the single-letter
+    //stuff
+    for (i = 0; i < sizeof(riscv_single_letter_exts) - 1; i++) {
+        if (cpu->env.misa_ext & RV(riscv_single_letter_exts[i])) {
+            *p++ = qemu_tolower(riscv_single_letter_exts[i]);
+        }
+    }
+    //and then I can steal code from riscv_isa_string_ext for the multi
+    //but obviously instead of strcat, I'll have to do a gstring_append()
+    //or similar
+    //
+    //FML on the cleanup for this crap though.
+}
+
+static void riscv_isa_set_props(RISCVCPU *cpu, void *fdt, char *nodename)
+{
+    char *name;
+    const size_t maxlen = sizeof("rv128i");
+    char *isa_base = g_new(char, maxlen);
+    char **isa_extensions;
+
+    isa_base = snprintf(isa_base, maxlen, "rv%di", TARGET_LONG_BITS);
+    qemu_fdt_setprop_string(fdt, cpu_name, "riscv,isa-base", isa_base);
+    g_free(isa_base);
+
+    /* call fn to get the list of strings */
+
+    /* setprop that shit */
+    qemu_fdt_setprop_string_array(fdt, nodename, "riscv,isa-extensions",
+                                          (char **) &extensions,
+                                          ARRAY_SIZE(extensions)
+    g_free0(isa_extensions); //can i do this?
+
+
+    name = riscv_isa_string(&s->soc[socket].harts[cpu]);
+    qemu_fdt_setprop_string(fdt, cpu_name, "riscv,isa", name);
+    g_free(name);
+}
+
 static gint riscv_cpu_list_compare(gconstpointer a, gconstpointer b)
 {
     ObjectClass *class_a = (ObjectClass *)a;
